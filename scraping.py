@@ -1,174 +1,356 @@
 import requests
 from bs4 import BeautifulSoup
 import pandas as pd
-import tkinter as tk
-from tkinter import filedialog, messagebox
 import time
-import urllib.parse
 import re
+import random
 import os
+from datetime import datetime
+import logging
 
-#para probar algo
+# Configurar logging
+logging.basicConfig(
+    filename='scraper.log',
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
 
 class ScholarScraperUH:
     def __init__(self):
         self.base_url = "https://scholar.google.com/scholar"
-        self.headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3',
-            'Accept-Language': 'es-ES,es;q=0.9'
-        }
-        self.target_articles = 500  # Cantidad objetivo de artículos a recolectar
-        self.max_retries = 3
-        self.pdf_folder = "PDFs_UH"
-
-    def build_query(self):
-        return '"Universidad de La Habana" OR "University of Havana"'
-
-    def extract_article_data(self, result):
-        title_tag = result.find('h3', class_='gs_rt')
-        title = title_tag.get_text(strip=True) if title_tag else 'Título no disponible'
+        self.user_agents = [
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.1.1 Safari/605.1.15',
+            'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.107 Safari/537.36',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:89.0) Gecko/20100101 Firefox/89.0'
+        ]
+        self.target_articles = 500
+        self.max_retries = 5
+        self.request_timeout = 30
+        self.session = requests.Session()
+        self.session.headers.update({
+            'Accept-Language': 'es-ES,es;q=0.9,en;q=0.8',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8'
+        })
         
-        authors_tag = result.find('div', class_='gs_a')
-        authors = authors_tag.get_text(strip=True) if authors_tag else 'Autores no disponibles'
+        # Términos de búsqueda optimizados
+        self.keyword_groups = [
+            # Tesis y trabajos académicos
+            ['"tesis"', '"doctorado"', '"tesis doctoral"', '"tesis de maestría"', '"tesis de licenciatura"'],
+            
+            # Facultades principales
+            ['"Facultad de Derecho"', '"Facultad de Economía"', '"Facultad de Psicología"', 
+             '"Facultad de Biología"', '"Facultad de Física"', '"Facultad de Química"'],
+            
+            # Otras unidades académicas
+            ['"Facultad de Matemática y Computación"', '"Facultad de Filosofía"', '"Facultad de Comunicación"',
+             '"Facultad de Turismo"', '"Facultad de Farmacia"', '"Facultad de Artes y Letras"'],
+            
+            # Institutos y centros
+            ['"Centro de Biomateriales"', '"Instituto Superior de Tecnologías"', '"IFAL"', '"INSTEC"']
+        ]
+        
+        # Mapeo de facultades para detección
+        self.facultad_map = {
+            'derecho': 'Facultad de Derecho',
+            'economía': 'Facultad de Economía',
+            'psicología': 'Facultad de Psicología',
+            'biología': 'Facultad de Biología',
+            'física': 'Facultad de Física',
+            'química': 'Facultad de Química',
+            'matemática': 'Facultad de Matemática y Computación',
+            'computación': 'Facultad de Matemática y Computación',
+            'filosofía': 'Facultad de Filosofía, Historia y Sociología',
+            'historia': 'Facultad de Filosofía, Historia y Sociología',
+            'sociología': 'Facultad de Filosofía, Historia y Sociología',
+            'comunicación': 'Facultad de Comunicación',
+            'turismo': 'Facultad de Turismo',
+            'farmacia': 'Facultad de Farmacia y Alimentos',
+            'alimentos': 'Facultad de Farmacia y Alimentos',
+            'artes': 'Facultad de Artes y Letras',
+            'letras': 'Facultad de Artes y Letras',
+            'lenguas': 'Facultad de Lenguas Extranjeras',
+            'geografía': 'Facultad de Geografía',
+            'biomateriales': 'Centro de Biomateriales',
+            'instec': 'Instituto Superior de Tecnologías y Ciencias Aplicadas'
+        }
 
-        # Filtrar artículos relevantes
-        if ("Universidad de La Habana" in authors or "University of Havana" in authors or
-            "Universidad de La Habana" in title or "University of Havana" in title):
+    def get_random_user_agent(self):
+        return random.choice(self.user_agents)
 
-            year = self.extract_year(authors)
+    def build_query(self, group_index=0):
+        """Construye consultas rotativas usando diferentes grupos de palabras clave"""
+        base = '"Universidad de La Habana" OR "University of Havana"'
+        keywords = " OR ".join(self.keyword_groups[group_index])
+        return f"({base}) AND ({keywords})"
+
+    def extract_metadata(self, result):
+        """Extrae metadatos detallados de un resultado de Google Scholar"""
+        try:
+            # Extraer título y enlace
+            title_tag = result.find('h3', class_='gs_rt')
+            title = title_tag.get_text(strip=True) if title_tag else 'Título no disponible'
+            
             link_tag = title_tag.find('a') if title_tag else None
-            link = link_tag['href'] if link_tag else '#'
-
-            # Intentar descargar PDF si está disponible
-            if link.endswith(".pdf"):
-                self.download_pdf(link, title)
-
+            link = link_tag['href'] if link_tag else ''
+            
+            # Identificar tipo de documento
+            doc_type = 'Artículo'
+            if any(t in title.lower() for t in ['tesis', 'dissertation', 'thesis']):
+                doc_type = 'Tesis'
+            elif any(t in title.lower() for t in ['conference', 'proceedings', 'congreso']):
+                doc_type = 'Conferencia'
+            
+            # Extraer información de autores y fuente
+            authors_tag = result.find('div', class_='gs_a')
+            authors_text = authors_tag.get_text(strip=True) if authors_tag else ''
+            
+            # Extraer año usando múltiples patrones
+            year = 'N/A'
+            year_patterns = [
+                r'\b(19|20)\d{2}\b',  # Años completos
+                r'–\s*(\d{4})',       # Patrón de rango de años
+                r'\((\d{4})\)'         # Años entre paréntesis
+            ]
+            for pattern in year_patterns:
+                match = re.search(pattern, authors_text)
+                if match:
+                    year = match.group(1) if len(match.groups()) > 0 else match.group(0)
+                    break
+            
+            # Extraer fuente/revista (el texto después del año)
+            if year != 'N/A' and authors_text:
+                source_parts = authors_text.split(year)
+                source = source_parts[-1].strip(' -.,') if len(source_parts) > 1 else ''
+            else:
+                source = authors_text
+            
+            # Extraer resumen
+            snippet_tag = result.find('div', class_='gs_rs')
+            resumen = snippet_tag.get_text(strip=True) if snippet_tag else ''
+            
+            # Extraer número de citas
+            cites_tag = result.find('a', href=re.compile(r'scholar\?cites'))
+            cites = re.search(r'\d+', cites_tag.text).group() if cites_tag else '0'
+            
+            # Extraer enlaces relacionados
+            links = {}
+            for link_tag in result.find_all('a', class_='gs_nph'):
+                link_text = link_tag.get_text(strip=True).lower()
+                if 'cite' in link_text:
+                    links['citas'] = 'https://scholar.google.com' + link_tag['href']
+                elif 'versions' in link_text:
+                    links['versiones'] = 'https://scholar.google.com' + link_tag['href']
+            
+            # Detectar idioma
+            idioma = 'español' if re.search(r'[áéíóúñ]', title + resumen, re.I) else 'inglés'
+            
+            # Detectar facultad
+            facultad = self.detect_facultad(title + " " + resumen + " " + authors_text)
+            
+            # Detectar PDF
+            pdf_link = ''
+            if link_tag and link_tag.find('span', class_='gs_ctg'):
+                pdf_link = link
+            elif result.find('div', class_='gs_or_ggsm'):
+                pdf_tag = result.find('div', class_='gs_or_ggsm').find('a')
+                pdf_link = pdf_tag['href'] if pdf_tag else ''
+            
             return {
                 'Título': title,
-                'Autores': authors,
+                'Tipo Documento': doc_type,
+                'Autores': authors_text,
                 'Año': year,
+                'Fuente': source,
+                'Resumen': resumen,
                 'Enlace': link,
-                'Institución': 'Universidad de La Habana'
+                'PDF': pdf_link,
+                'Citas': cites,
+                'Enlaces Relacionados': str(links),
+                'Idioma': idioma,
+                'Facultad': facultad,
+                'Institución': 'Universidad de La Habana',
+                'Timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             }
-        else:
+            
+        except Exception as e:
+            logging.error(f"Error extrayendo metadatos: {str(e)}")
             return None
 
-    def extract_year(self, authors_text):
-        match = re.search(r'\b(19|20)\d{2}\b', authors_text)
-        return match.group(0) if match else 'N/A'
+    def detect_facultad(self, text):
+        """Detecta la facultad basada en palabras clave en el texto"""
+        text_lower = text.lower()
+        for keyword, facultad in self.facultad_map.items():
+            if keyword in text_lower:
+                return facultad
+        return 'Desconocida'
 
-    def download_pdf(self, url, title):
-        try:
-            if url.endswith(".pdf"):
-                safe_title = "".join(c for c in title if c.isalnum() or c in " _-").rstrip()
-                filename = os.path.join(self.pdf_folder, f"{safe_title[:80]}.pdf")
-                r = requests.get(url, headers=self.headers, timeout=15)
-                if r.status_code == 200 and r.headers.get('Content-Type', '').lower().startswith('application/pdf'):
-                    with open(filename, 'wb') as f:
-                        f.write(r.content)
-                    print(f"PDF guardado: {filename}")
-                    return True
-        except Exception as e:
-            print(f"Error al descargar PDF: {e}")
+    def handle_captcha(self, response):
+        """Detecta si la respuesta contiene CAPTCHA"""
+        if "Our systems have detected unusual traffic" in response.text:
+            logging.warning("CAPTCHA detectado. Necesita intervención manual.")
+            return True
         return False
 
-    def scrape(self):
+    def scrape_page(self, params, group_index):
+        """Extrae artículos de una página específica"""
         articles = []
-        page = 0
-        session = requests.Session()
-        session.headers.update(self.headers)
-
-        # Crear carpeta para PDFs
-        os.makedirs(self.pdf_folder, exist_ok=True)
-
-        while len(articles) < self.target_articles:
-            params = {
-                'q': self.build_query(),
-                'start': page * 10,
-                'hl': 'es',
-                'as_ylo': '2010'
-            }
-
-            for attempt in range(self.max_retries):
-                try:
-                    response = session.get(self.base_url, params=params)
-                    response.raise_for_status()
-
-                    soup = BeautifulSoup(response.text, 'html.parser')
-                    results = soup.find_all('div', class_='gs_ri')
-
-                    with open(f'resultado_pagina_{page}.html', 'w', encoding='utf-8') as f:
-                        f.write(response.text)
-
-                    if not results:
-                        print("No se encontraron resultados. Verifica si Google ha bloqueado el scraping.")
-                        return articles
-                    
-                    for result in results:
+        retries = 0
+        
+        while retries < self.max_retries:
+            try:
+                # Rotar User-Agent y añadir delay aleatorio
+                self.session.headers['User-Agent'] = self.get_random_user_agent()
+                delay = random.uniform(3, 8)
+                time.sleep(delay)
+                
+                response = self.session.get(
+                    self.base_url, 
+                    params=params,
+                    timeout=self.request_timeout
+                )
+                
+                # Verificar bloqueo por CAPTCHA
+                if self.handle_captcha(response):
+                    logging.error("Bloqueo por CAPTCHA detectado. Deteniendo scraping.")
+                    return []
+                
+                response.raise_for_status()
+                
+                soup = BeautifulSoup(response.text, 'html.parser')
+                
+                # Verificar si no hay resultados
+                no_results = soup.find('div', class_='gs_r')
+                if not no_results:
+                    logging.info("No se encontraron resultados para esta consulta")
+                    return []
+                
+                # Extraer todos los resultados
+                results = soup.find_all('div', class_='gs_ri')
+                logging.info(f"Encontrados {len(results)} resultados en la página {params['start']//10 + 1}")
+                
+                for result in results:
+                    metadata = self.extract_metadata(result)
+                    if metadata:
+                        articles.append(metadata)
                         if len(articles) >= self.target_articles:
-                            break
-                        article = self.extract_article_data(result)
-                        if article:
-                            articles.append(article)
+                            return articles
+                
+                return articles
+                
+            except requests.exceptions.RequestException as e:
+                retries += 1
+                wait_time = 10 * retries
+                logging.warning(f"Error de red ({str(e)}). Reintento {retries}/{self.max_retries} en {wait_time}s")
+                time.sleep(wait_time)
+                
+            except Exception as e:
+                logging.error(f"Error inesperado: {str(e)}")
+                retries += 1
+                time.sleep(20)
+        
+        logging.error(f"Fallo después de {self.max_retries} intentos")
+        return []
 
-                    time.sleep(2 if page % 3 == 0 else 5)
-                    page += 1
-                    break
-
-                except requests.exceptions.HTTPError as e:
-                    if e.response.status_code == 429:
-                        wait_time = 30 * (attempt + 1)
-                        print(f"Bloqueo detectado. Esperando {wait_time} segundos...")
-                        time.sleep(wait_time)
-                    else:
-                        raise
-
-        return articles[:self.target_articles]
-
-class Application(tk.Tk):
-    def __init__(self):
-        super().__init__()
-        self.title("Extracción UH - Google Scholar")
-        self.geometry("400x150")
-        self.scraper = ScholarScraperUH()
-        self.create_widgets()
-
-    def create_widgets(self):
-        tk.Label(self, text="Guardar resultados en:").pack(pady=5)
-
-        self.btn_folder = tk.Button(self, text="Seleccionar Carpeta", command=self.select_folder)
-        self.btn_folder.pack(pady=5)
-
-        self.btn_start = tk.Button(self, text="Iniciar Extracción", command=self.start_scraping)
-        self.btn_start.pack(pady=10)
-
-        self.status_label = tk.Label(self, text="")
-        self.status_label.pack()
-
-    def select_folder(self):
-        self.folder_path = filedialog.askdirectory()
-        self.scraper.pdf_folder = os.path.join(self.folder_path, "PDFs")
-        os.makedirs(self.scraper.pdf_folder, exist_ok=True)
-
-    def start_scraping(self):
+    def scrape(self):
+        """Ejecuta el proceso completo de scraping"""
+        all_articles = []
+        group_index = 0
+        start_page = 0
+        
         try:
-            self.status_label.config(text="Extrayendo artículos...")
-            self.update_idletasks()
+            # Intentar cargar progreso previo
+            if os.path.exists('progress.txt'):
+                with open('progress.txt', 'r') as f:
+                    group_index = int(f.readline().strip())
+                    start_page = int(f.readline().strip())
+                logging.info(f"Reanudando desde grupo {group_index}, página {start_page}")
+        
+        except Exception:
+            pass
+        
+        while len(all_articles) < self.target_articles and group_index < len(self.keyword_groups):
+            page = start_page
+            start_page = 0  # Reset después de la primera iteración
+            
+            while len(all_articles) < self.target_articles:
+                params = {
+                    'q': self.build_query(group_index),
+                    'start': page * 10,
+                    'hl': 'es',
+                    'as_ylo': '2000'
+                }
+                
+                logging.info(f"Scraping: Grupo {group_index+1}/{len(self.keyword_groups)}, Página {page+1}")
+                articles = self.scrape_page(params, group_index)
+                
+                if not articles:
+                    logging.info(f"No se encontraron más artículos para el grupo {group_index}")
+                    break
+                
+                all_articles.extend(articles)
+                
+                # Guardar progreso
+                with open('progress.txt', 'w') as f:
+                    f.write(f"{group_index}\n{page + 1}")
+                
+                page += 1
+                
+                # Si llegamos al límite de artículos
+                if len(all_articles) >= self.target_articles:
+                    break
+            
+            group_index += 1
+        
+        # Limpiar archivo de progreso
+        if os.path.exists('progress.txt'):
+            os.remove('progress.txt')
+        
+        return all_articles[:self.target_articles]
 
-            articles = self.scraper.scrape()
-            if not articles:
-                messagebox.showwarning("Aviso", "No se encontraron artículos. Revisa el archivo HTML generado.")
-                return
-
-            filename = f"{self.folder_path}/articulos_uh.csv" if hasattr(self, 'folder_path') else "articulos_uh.csv"
+    def save_results(self, articles, filename="articulos_uh.csv"):
+        """Guarda los resultados en CSV con manejo de errores"""
+        try:
             df = pd.DataFrame(articles)
+            
+            # Crear directorio si no existe
+            os.makedirs(os.path.dirname(filename), exist_ok=True)
+            
+            # Guardar en CSV
             df.to_csv(filename, index=False, encoding='utf-8-sig')
-
-            messagebox.showinfo("Éxito", f"Se encontraron {len(articles)} artículos\nGuardados en: {filename}\nPDFs en: {self.scraper.pdf_folder}")
-
+            logging.info(f"Archivo guardado: {filename}")
+            
+            # Guardar copia de seguridad
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            backup_file = f"backups/{timestamp}_{os.path.basename(filename)}"
+            df.to_csv(backup_file, index=False, encoding='utf-8-sig')
+            
+            return True
+        
         except Exception as e:
-            messagebox.showerror("Error", f"Error durante la extracción:\n{str(e)}")
+            logging.error(f"Error guardando resultados: {str(e)}")
+            return False
 
 if __name__ == "__main__":
-    app = Application()
-    app.mainloop()
+    print("Iniciando extracción de documentos científicos de la UH...")
+    
+    scraper = ScholarScraperUH()
+    articulos = scraper.scrape()
+    
+    if articulos:
+        print(f"\nExtracción completada! Artículos encontrados: {len(articulos)}")
+        scraper.save_results(articulos)
+        
+        # Mostrar resumen
+        df = pd.DataFrame(articulos)
+        print("\nResumen estadístico:")
+        print(f"- Años cubiertos: {df['Año'].min()} - {df['Año'].max()}")
+        print(f"- Facultades más comunes:")
+        print(df['Facultad'].value_counts().head(5))
+        print(f"- Tipos de documentos: {df['Tipo Documento'].value_counts().to_dict()}")
+        
+        print("\nDatos guardados en articulos_uh.csv")
+    else:
+        print("No se encontraron artículos. Verifique el log para detalles.")
+    
+    print("Proceso finalizado.")

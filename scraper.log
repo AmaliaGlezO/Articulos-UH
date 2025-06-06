@@ -99,3 +99,94 @@
 2025-06-05 23:29:59,763 - INFO - Scraping: Grupo 1/4, Página 50
 2025-06-05 23:30:04,564 - INFO - Encontrados 10 resultados en la página 50
 2025-06-05 23:30:04,568 - ERROR - Error guardando resultados: [WinError 3] El sistema no puede encontrar la ruta especificada: ''
+2025-06-05 23:40:48,514 - INFO - Scraping: Grupo 1/4, Página 1
+2025-06-05 23:40:55,994 - INFO - Encontrados 10 resultados en la página 1
+2025-06-05 23:40:55,997 - INFO - Scraping: Grupo 1/4, Página 2
+2025-06-05 23:41:02,947 - INFO - Encontrados 10 resultados en la página 2
+2025-06-05 23:41:02,952 - INFO - Scraping: Grupo 1/4, Página 3
+2025-06-05 23:41:10,348 - INFO - Encontrados 10 resultados en la página 3
+2025-06-05 23:41:10,351 - INFO - Scraping: Grupo 1/4, Página 4
+2025-06-05 23:41:17,797 - INFO - Encontrados 10 resultados en la página 4
+2025-06-05 23:41:17,800 - INFO - Scraping: Grupo 1/4, Página 5
+2025-06-05 23:41:23,122 - INFO - Encontrados 10 resultados en la página 5
+2025-06-05 23:41:23,124 - INFO - Scraping: Grupo 1/4, Página 6
+2025-06-05 23:41:30,640 - INFO - Encontrados 10 resultados en la página 6
+2025-06-05 23:41:30,643 - INFO - Scraping: Grupo 1/4, Página 7
+2025-06-05 23:41:38,839 - INFO - Encontrados 10 resultados en la página 7
+2025-06-05 23:41:38,843 - INFO - Scraping: Grupo 1/4, Página 8
+2025-06-05 23:41:43,666 - INFO - Encontrados 10 resultados en la página 8
+2025-06-05 23:41:43,671 - INFO - Scraping: Grupo 1/4, Página 9
+2025-06-05 23:41:49,770 - INFO - Encontrados 10 resultados en la página 9
+2025-06-05 23:41:49,775 - INFO - Scraping: Grupo 1/4, Página 10
+2025-06-05 23:41:55,444 - INFO - Encontrados 10 resultados en la página 10
+2025-06-05 23:41:55,448 - INFO - Scraping: Grupo 1/4, Página 11
+2025-06-05 23:42:04,010 - INFO - Encontrados 10 resultados en la página 11
+2025-06-05 23:42:04,013 - INFO - Scraping: Grupo 1/4, Página 12
+2025-06-05 23:42:12,295 - INFO - Encontrados 10 resultados en la página 12
+2025-06-05 23:42:12,308 - INFO - Scraping: Grupo 1/4, Página 13
+2025-06-05 23:42:17,537 - INFO - Encontrados 10 resultados en la página 13
+2025-06-05 23:42:17,543 - INFO - Scraping: Grupo 1/4, Página 14
+2025-06-05 23:42:25,910 - INFO - Encontrados 10 resultados en la página 14
+2025-06-05 23:42:25,923 - INFO - Scraping: Grupo 1/4, Página 15
+2025-06-05 23:52:25,487 - INFO - Reanudando desde grupo 0, página 14
+2025-06-05 23:52:25,487 - INFO - Scraping: Grupo 1/4, Página 15
+2025-06-05 23:52:35,350 - INFO - Encontrados 10 resultados en la página 15
+2025-06-05 23:52:35,355 - INFO - Scraping: Grupo 1/4, Página 16
+2025-06-05 23:52:44,446 - INFO - Encontrados 10 resultados en la página 16
+2025-06-05 23:52:44,449 - INFO - Scraping: Grupo 1/4, Página 17
+2025-06-05 23:52:51,541 - INFO - Encontrados 10 resultados en la página 17
+2025-06-05 23:52:51,544 - INFO - Scraping: Grupo 1/4, Página 18
+2025-06-06 11:49:19,922 - INFO - Reanudando desde grupo 0, página 17
+2025-06-06 11:49:19,922 - INFO - Scraping: Grupo 1/4, Página 18
+2025-06-06 11:49:28,127 - INFO - Scraping: Grupo 1/4, Página 19
+2025-06-06 11:49:36,056 - INFO - Scraping: Grupo 1/4, Página 20
+2025-06-06 11:49:41,736 - INFO - Scraping: Grupo 1/4, Página 21
+2025-06-06 11:49:45,843 - INFO - Scraping: Grupo 1/4, Página 22
+2025-06-06 11:49:53,055 - INFO - Scraping: Grupo 1/4, Página 23
+2025-06-06 11:49:56,953 - INFO - Scraping: Grupo 1/4, Página 24
+2025-06-06 11:50:01,605 - INFO - Scraping: Grupo 1/4, Página 25
+2025-06-06 11:50:09,695 - INFO - Scraping: Grupo 1/4, Página 26
+2025-06-06 11:50:16,909 - INFO - Scraping: Grupo 1/4, Página 27
+2025-06-06 11:50:25,154 - INFO - Scraping: Grupo 1/4, Página 28
+2025-06-06 11:50:29,794 - INFO - Scraping: Grupo 1/4, Página 29
+2025-06-06 11:50:36,733 - INFO - Scraping: Grupo 1/4, Página 30
+2025-06-06 11:50:40,772 - INFO - Scraping: Grupo 1/4, Página 31
+2025-06-06 11:50:49,718 - INFO - Scraping: Grupo 1/4, Página 32
+2025-06-06 11:50:57,330 - INFO - Scraping: Grupo 1/4, Página 33
+2025-06-06 11:51:03,710 - INFO - Scraping: Grupo 1/4, Página 34
+2025-06-06 11:51:08,587 - INFO - Scraping: Grupo 1/4, Página 35
+2025-06-06 11:51:13,892 - INFO - Scraping: Grupo 1/4, Página 36
+2025-06-06 11:51:18,811 - INFO - Scraping: Grupo 1/4, Página 37
+2025-06-06 11:51:27,088 - INFO - Scraping: Grupo 1/4, Página 38
+2025-06-06 11:51:31,913 - INFO - Scraping: Grupo 1/4, Página 39
+2025-06-06 11:51:35,928 - INFO - Scraping: Grupo 1/4, Página 40
+2025-06-06 11:51:40,222 - INFO - Scraping: Grupo 1/4, Página 41
+2025-06-06 11:51:46,100 - INFO - Scraping: Grupo 1/4, Página 42
+2025-06-06 11:51:50,248 - INFO - Scraping: Grupo 1/4, Página 43
+2025-06-06 11:51:56,483 - INFO - Scraping: Grupo 1/4, Página 44
+2025-06-06 11:52:03,979 - INFO - Scraping: Grupo 1/4, Página 45
+2025-06-06 11:52:10,211 - INFO - Scraping: Grupo 1/4, Página 46
+2025-06-06 11:52:16,741 - INFO - Scraping: Grupo 1/4, Página 47
+2025-06-06 11:52:22,853 - INFO - Scraping: Grupo 1/4, Página 48
+2025-06-06 11:52:26,608 - INFO - Scraping: Grupo 1/4, Página 49
+2025-06-06 11:52:30,460 - INFO - Scraping: Grupo 1/4, Página 50
+2025-06-06 11:52:38,861 - INFO - Scraping: Grupo 1/4, Página 51
+2025-06-06 11:52:47,217 - INFO - Scraping: Grupo 1/4, Página 52
+2025-06-06 11:52:54,593 - INFO - Scraping: Grupo 1/4, Página 53
+2025-06-06 11:53:01,337 - INFO - Scraping: Grupo 1/4, Página 54
+2025-06-06 11:53:09,245 - INFO - Scraping: Grupo 1/4, Página 55
+2025-06-06 11:53:17,651 - INFO - Scraping: Grupo 1/4, Página 56
+2025-06-06 11:53:21,821 - INFO - Scraping: Grupo 1/4, Página 57
+2025-06-06 11:53:30,294 - INFO - Scraping: Grupo 1/4, Página 58
+2025-06-06 11:53:36,498 - INFO - Scraping: Grupo 1/4, Página 59
+2025-06-06 11:53:42,064 - INFO - Scraping: Grupo 1/4, Página 60
+2025-06-06 11:53:48,718 - INFO - Scraping: Grupo 1/4, Página 61
+2025-06-06 11:53:54,757 - INFO - Scraping: Grupo 1/4, Página 62
+2025-06-06 11:54:02,402 - INFO - Scraping: Grupo 1/4, Página 63
+2025-06-06 11:54:10,125 - INFO - Scraping: Grupo 1/4, Página 64
+2025-06-06 11:54:18,554 - INFO - Scraping: Grupo 1/4, Página 65
+2025-06-06 11:54:25,294 - INFO - Scraping: Grupo 1/4, Página 66
+2025-06-06 11:54:30,887 - INFO - Scraping: Grupo 1/4, Página 67
+2025-06-06 11:54:37,792 - INFO - Archivo guardado: articulos_uh.csv
+2025-06-06 11:54:37,804 - INFO - Copia de seguridad guardada: backups\20250606_115437_articulos_uh.csv
+2025-06-06 11:54:37,822 - INFO - Archivo JSON guardado: articulos_uh.json

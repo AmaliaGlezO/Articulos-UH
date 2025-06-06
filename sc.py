@@ -5,6 +5,7 @@ import time
 import re
 import random
 import os
+import json
 from datetime import datetime
 import logging
 
@@ -37,15 +38,12 @@ class ScholarScraperUH:
         self.keyword_groups = [
             # Tesis y trabajos académicos
             ['"tesis"', '"doctorado"', '"tesis doctoral"', '"tesis de maestría"', '"tesis de licenciatura"'],
-            
             # Facultades principales
             ['"Facultad de Derecho"', '"Facultad de Economía"', '"Facultad de Psicología"', 
              '"Facultad de Biología"', '"Facultad de Física"', '"Facultad de Química"'],
-            
             # Otras unidades académicas
             ['"Facultad de Matemática y Computación"', '"Facultad de Filosofía"', '"Facultad de Comunicación"',
              '"Facultad de Turismo"', '"Facultad de Farmacia"', '"Facultad de Artes y Letras"'],
-            
             # Institutos y centros
             ['"Centro de Biomateriales"', '"Instituto Superior de Tecnologías"', '"IFAL"', '"INSTEC"']
         ]
@@ -79,21 +77,20 @@ class ScholarScraperUH:
         return random.choice(self.user_agents)
 
     def build_query(self, group_index=0):
-        """Construye consultas rotativas usando diferentes grupos de palabras clave"""
         base = '"Universidad de La Habana" OR "University of Havana"'
         keywords = " OR ".join(self.keyword_groups[group_index])
         return f"({base}) AND ({keywords})"
 
     def extract_metadata(self, result):
-        """Extrae metadatos detallados de un resultado de Google Scholar"""
         try:
             # Extraer título y enlace
             title_tag = result.find('h3', class_='gs_rt')
             title = title_tag.get_text(strip=True) if title_tag else 'Título no disponible'
-            
             link_tag = title_tag.find('a') if title_tag else None
             link = link_tag['href'] if link_tag else ''
-            
+            # Notificación en consola
+            print(f"Metadatos extraídos de {link}")
+
             # Identificar tipo de documento
             doc_type = 'Artículo'
             if any(t in title.lower() for t in ['tesis', 'dissertation', 'thesis']):
@@ -108,9 +105,9 @@ class ScholarScraperUH:
             # Extraer año usando múltiples patrones
             year = 'N/A'
             year_patterns = [
-                r'\b(19|20)\d{2}\b',  # Años completos
-                r'–\s*(\d{4})',       # Patrón de rango de años
-                r'\((\d{4})\)'         # Años entre paréntesis
+                r'\b(19|20)\d{2}\b',
+                r'–\s*(\d{4})',
+                r'\((\d{4})\)'
             ]
             for pattern in year_patterns:
                 match = re.search(pattern, authors_text)
@@ -135,12 +132,12 @@ class ScholarScraperUH:
             
             # Extraer enlaces relacionados
             links = {}
-            for link_tag in result.find_all('a', class_='gs_nph'):
-                link_text = link_tag.get_text(strip=True).lower()
+            for link_tag2 in result.find_all('a', class_='gs_nph'):
+                link_text = link_tag2.get_text(strip=True).lower()
                 if 'cite' in link_text:
-                    links['citas'] = 'https://scholar.google.com' + link_tag['href']
+                    links['citas'] = 'https://scholar.google.com' + link_tag2['href']
                 elif 'versions' in link_text:
-                    links['versiones'] = 'https://scholar.google.com' + link_tag['href']
+                    links['versiones'] = 'https://scholar.google.com' + link_tag2['href']
             
             # Detectar idioma
             idioma = 'español' if re.search(r'[áéíóúñ]', title + resumen, re.I) else 'inglés'
@@ -166,7 +163,7 @@ class ScholarScraperUH:
                 'Enlace': link,
                 'PDF': pdf_link,
                 'Citas': cites,
-                'Enlaces Relacionados': str(links),
+                'Enlaces Relacionados': links,
                 'Idioma': idioma,
                 'Facultad': facultad,
                 'Institución': 'Universidad de La Habana',
@@ -178,7 +175,6 @@ class ScholarScraperUH:
             return None
 
     def detect_facultad(self, text):
-        """Detecta la facultad basada en palabras clave en el texto"""
         text_lower = text.lower()
         for keyword, facultad in self.facultad_map.items():
             if keyword in text_lower:
@@ -186,20 +182,17 @@ class ScholarScraperUH:
         return 'Desconocida'
 
     def handle_captcha(self, response):
-        """Detecta si la respuesta contiene CAPTCHA"""
         if "Our systems have detected unusual traffic" in response.text:
             logging.warning("CAPTCHA detectado. Necesita intervención manual.")
             return True
         return False
 
     def scrape_page(self, params, group_index):
-        """Extrae artículos de una página específica"""
         articles = []
         retries = 0
         
         while retries < self.max_retries:
             try:
-                # Rotar User-Agent y añadir delay aleatorio
                 self.session.headers['User-Agent'] = self.get_random_user_agent()
                 delay = random.uniform(3, 8)
                 time.sleep(delay)
@@ -210,24 +203,17 @@ class ScholarScraperUH:
                     timeout=self.request_timeout
                 )
                 
-                # Verificar bloqueo por CAPTCHA
                 if self.handle_captcha(response):
                     logging.error("Bloqueo por CAPTCHA detectado. Deteniendo scraping.")
                     return []
                 
                 response.raise_for_status()
-                
                 soup = BeautifulSoup(response.text, 'html.parser')
                 
-                # Verificar si no hay resultados
-                no_results = soup.find('div', class_='gs_r')
-                if not no_results:
+                results = soup.find_all('div', class_='gs_ri')
+                if not results:
                     logging.info("No se encontraron resultados para esta consulta")
                     return []
-                
-                # Extraer todos los resultados
-                results = soup.find_all('div', class_='gs_ri')
-                logging.info(f"Encontrados {len(results)} resultados en la página {params['start']//10 + 1}")
                 
                 for result in results:
                     metadata = self.extract_metadata(result)
@@ -235,7 +221,6 @@ class ScholarScraperUH:
                         articles.append(metadata)
                         if len(articles) >= self.target_articles:
                             return articles
-                
                 return articles
                 
             except requests.exceptions.RequestException as e:
@@ -243,36 +228,30 @@ class ScholarScraperUH:
                 wait_time = 10 * retries
                 logging.warning(f"Error de red ({str(e)}). Reintento {retries}/{self.max_retries} en {wait_time}s")
                 time.sleep(wait_time)
-                
             except Exception as e:
                 logging.error(f"Error inesperado: {str(e)}")
                 retries += 1
                 time.sleep(20)
-        
         logging.error(f"Fallo después de {self.max_retries} intentos")
         return []
 
     def scrape(self):
-        """Ejecuta el proceso completo de scraping"""
         all_articles = []
         group_index = 0
         start_page = 0
         
         try:
-            # Intentar cargar progreso previo
             if os.path.exists('progress.txt'):
                 with open('progress.txt', 'r') as f:
                     group_index = int(f.readline().strip())
                     start_page = int(f.readline().strip())
                 logging.info(f"Reanudando desde grupo {group_index}, página {start_page}")
-        
         except Exception:
             pass
         
         while len(all_articles) < self.target_articles and group_index < len(self.keyword_groups):
             page = start_page
-            start_page = 0  # Reset después de la primera iteración
-            
+            start_page = 0
             while len(all_articles) < self.target_articles:
                 params = {
                     'q': self.build_query(group_index),
@@ -280,82 +259,57 @@ class ScholarScraperUH:
                     'hl': 'es',
                     'as_ylo': '2000'
                 }
-                
                 logging.info(f"Scraping: Grupo {group_index+1}/{len(self.keyword_groups)}, Página {page+1}")
                 articles = self.scrape_page(params, group_index)
-                
                 if not articles:
                     logging.info(f"No se encontraron más artículos para el grupo {group_index}")
                     break
-                
                 all_articles.extend(articles)
-                
-                # Guardar progreso
                 with open('progress.txt', 'w') as f:
                     f.write(f"{group_index}\n{page + 1}")
-                
                 page += 1
-                
-                # Si llegamos al límite de artículos
                 if len(all_articles) >= self.target_articles:
                     break
-            
             group_index += 1
-        
-        # Limpiar archivo de progreso
         if os.path.exists('progress.txt'):
             os.remove('progress.txt')
-        
         return all_articles[:self.target_articles]
 
-    def save_results(self, articles, filename="articulos_uh.csv"):
-        """Guarda los resultados en CSV con manejo de errores"""
+    def save_results(self, articles, csv_filename="articulos_uh.csv", json_filename="articulos_uh.json"):
         try:
             if not articles:
                 logging.warning("No hay artículos para guardar")
                 return False
-                
             df = pd.DataFrame(articles)
-            
-            # Crear directorio principal si no existe
-            os.makedirs(os.path.dirname(filename), exist_ok=True)
-            
-            # Crear directorio de backups si no existe
+            os.makedirs(os.path.dirname(csv_filename) or ".", exist_ok=True)
             backup_dir = "backups"
             os.makedirs(backup_dir, exist_ok=True)
-            
-            # Guardar en CSV
-            df.to_csv(filename, index=False, encoding='utf-8-sig')
-            logging.info(f"Archivo guardado: {filename}")
-            
-            # Guardar copia de seguridad
+            df.to_csv(csv_filename, index=False, encoding='utf-8-sig')
+            logging.info(f"Archivo guardado: {csv_filename}")
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            backup_file = os.path.join(backup_dir, f"{timestamp}_{os.path.basename(filename)}")
+            backup_file = os.path.join(backup_dir, f"{timestamp}_{os.path.basename(csv_filename)}")
             df.to_csv(backup_file, index=False, encoding='utf-8-sig')
             logging.info(f"Copia de seguridad guardada: {backup_file}")
-            
+
+            # Guardar también en JSON
+            with open(json_filename, 'w', encoding='utf-8') as jf:
+                json.dump(articles, jf, ensure_ascii=False, indent=2)
+            logging.info(f"Archivo JSON guardado: {json_filename}")
             return True
-        
         except Exception as e:
             logging.error(f"Error guardando resultados: {str(e)}", exc_info=True)
             return False
 
 if __name__ == "__main__":
     print("Iniciando extracción de documentos científicos de la UH...")
-    
     scraper = ScholarScraperUH()
     articulos = scraper.scrape()
-    
     if articulos:
         print(f"\nExtracción completada! Artículos encontrados: {len(articulos)}")
-        
-        # Guardar resultados
         if scraper.save_results(articulos):
-            print("Datos guardados exitosamente en articulos_uh.csv")
+            print("Datos guardados exitosamente en articulos_uh.csv y articulos_uh.json")
         else:
             print("Error al guardar los datos. Ver scraper.log")
-        
-        # Mostrar resumen
         try:
             df = pd.DataFrame(articulos)
             print("\nResumen estadístico:")
@@ -364,9 +318,7 @@ if __name__ == "__main__":
             print(f"- Facultades más comunes:")
             print(df['Facultad'].value_counts().head(5))
             print(f"- Tipos de documentos: {df['Tipo Documento'].value_counts().to_dict()}")
-        except Exception as e:
-            print(f"Error generando resumen: {str(e)}")
+        except Exception:
+            pass
     else:
-        print("No se encontraron artículos. Verifique el scraper.log para detalles.")
-    
-    print("Proceso finalizado.")
+        print("No se extrajo ningún artículo.")

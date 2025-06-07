@@ -190,3 +190,9 @@
 2025-06-06 11:54:37,792 - INFO - Archivo guardado: articulos_uh.csv
 2025-06-06 11:54:37,804 - INFO - Copia de seguridad guardada: backups\20250606_115437_articulos_uh.csv
 2025-06-06 11:54:37,822 - INFO - Archivo JSON guardado: articulos_uh.json
+2025-06-06 18:56:35,981 - INFO - Buscando: "Universidad de La Habana"
+2025-06-06 18:56:37,360 - ERROR - Error buscando en Semantic Scholar: 403 Client Error: Forbidden for url: https://api.semanticscholar.org/graph/v1/paper/search?query=%22Universidad+de+La+Habana%22&limit=50&fields=title%2Cauthors%2Cyear%2Cabstract%2CcitationCount%2Creferences%2CfieldsOfStudy%2Curl%2Cpdf
+2025-06-06 18:56:37,361 - INFO - Buscando: "University of Havana"
+2025-06-06 18:56:37,755 - ERROR - Error buscando en Semantic Scholar: 403 Client Error: Forbidden for url: https://api.semanticscholar.org/graph/v1/paper/search?query=%22University+of+Havana%22&limit=50&fields=title%2Cauthors%2Cyear%2Cabstract%2CcitationCount%2Creferences%2CfieldsOfStudy%2Curl%2Cpdf
+2025-06-06 18:56:37,756 - INFO - Buscando: affiliation:"Universidad de La Habana"
+2025-06-06 18:56:37,963 - ERROR - Error buscando en Semantic Scholar: 403 Client Error: Forbidden for url: https://api.semanticscholar.org/graph/v1/paper/search?query=affiliation%3A%22Universidad+de+La+Habana%22&limit=50&fields=title%2Cauthors%2Cyear%2Cabstract%2CcitationCount%2Creferences%2CfieldsOfStudy%2Curl%2Cpdf

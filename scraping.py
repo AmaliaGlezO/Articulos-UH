@@ -8,16 +8,11 @@ import os
 import json
 from datetime import datetime
 import logging
-
-# Configurar logging
-logging.basicConfig(
-    filename='scraper.log',
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
-)
+import PyPDF2
+from io import BytesIO
 
 class ScholarScraperUH:
-    def __init__(self):
+    def __init__(self, fireworks_api_key=None):
         self.base_url = "https://scholar.google.com/scholar"
         self.user_agents = [
             'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
@@ -43,7 +38,7 @@ class ScholarScraperUH:
              '"Facultad de Biología"', '"Facultad de Física"', '"Facultad de Química"'],
             # Otras unidades académicas
             ['"Facultad de Matemática y Computación"', '"Facultad de Filosofía"', '"Facultad de Comunicación"',
-             '"Facultad de Turismo"', '"Facultad de Farmacia"', '"Facultad de Artes y Letras"'],
+             '"Facultad de Turismo"', '"Facultad de Farmacia"', '"Facultad de Artes y Letras"','"MATCOM'],
             # Institutos y centros
             ['"Centro de Biomateriales"', '"Instituto Superior de Tecnologías"', '"IFAL"', '"INSTEC"']
         ]
@@ -70,8 +65,15 @@ class ScholarScraperUH:
             'lenguas': 'Facultad de Lenguas Extranjeras',
             'geografía': 'Facultad de Geografía',
             'biomateriales': 'Centro de Biomateriales',
-            'instec': 'Instituto Superior de Tecnologías y Ciencias Aplicadas'
+            'instec': 'Instituto Superior de Tecnologías y Ciencias Aplicadas',
+            'matcom': 'MATCOM'
         }
+
+        self.fireworks_api_key = fireworks_api_key
+        self.fireworks_headers = {
+            "Authorization": f"Bearer {fireworks_api_key}",
+            "Content-Type": "application/json"
+        } if fireworks_api_key else None
 
     def get_random_user_agent(self):
         return random.choice(self.user_agents)
@@ -80,6 +82,64 @@ class ScholarScraperUH:
         base = '"Universidad de La Habana" OR "University of Havana"'
         keywords = " OR ".join(self.keyword_groups[group_index])
         return f"({base}) AND ({keywords})"
+
+    def analyze_with_fireworks(self, text):
+        """Usa Fireworks AI para analizar texto y extraer metadatos adicionales"""
+        if not self.fireworks_api_key or not text:
+            return {}
+        
+        try:
+            # Limitar el texto a los primeros 5000 caracteres para evitar costos altos
+            text = text[:5000]
+            
+            prompt = """Extrae la siguiente información de este texto académico en formato JSON:
+            - Temas principales (3-5)
+            - Metodología utilizada
+            - Hallazgos clave
+            - Palabras clave técnicas (5-10)
+            - Posible facultad/área de conocimiento
+            
+            Texto: {text}""".format(text=text)
+            
+            payload = {
+                "model": "accounts/fireworks/models/llama-v2-70b-chat",
+                "prompt": prompt,
+                "max_tokens": 1000,
+                "temperature": 0.3
+            }
+            
+            response = requests.post(
+                "https://api.fireworks.ai/inference/v1/completions",
+                headers=self.fireworks_headers,
+                json=payload,
+                timeout=30
+            )
+            response.raise_for_status()
+            
+            # Parsear la respuesta JSON
+            result = response.json()
+            analysis = json.loads(result['choices'][0]['text'].strip())
+            return analysis
+            
+        except Exception as e:
+            logging.error(f"Error en Fireworks AI: {str(e)}")
+            return {}
+
+    def extract_pdf_content(self, pdf_url):
+        """Extrae texto de un PDF dado su URL"""
+        try:
+            response = self.session.get(pdf_url, timeout=self.request_timeout)
+            response.raise_for_status()
+            
+            with BytesIO(response.content) as pdf_file:
+                reader = PyPDF2.PdfReader(pdf_file)
+                text = ""
+                for page in reader.pages:
+                    text += page.extract_text() + "\n"
+                return text
+        except Exception as e:
+            logging.error(f"Error extrayendo PDF {pdf_url}: {str(e)}")
+            return None
 
     def extract_metadata(self, result):
         try:
@@ -153,7 +213,7 @@ class ScholarScraperUH:
                 pdf_tag = result.find('div', class_='gs_or_ggsm').find('a')
                 pdf_link = pdf_tag['href'] if pdf_tag else ''
             
-            return {
+            metadata = {
                 'Título': title,
                 'Tipo Documento': doc_type,
                 'Autores': authors_text,
@@ -170,10 +230,23 @@ class ScholarScraperUH:
                 'Timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             }
             
+            # Añadir análisis de Fireworks si hay API key y PDF disponible
+            if self.fireworks_api_key and pdf_link:
+                pdf_text = self.extract_pdf_content(pdf_link)
+                if pdf_text:
+                    fireworks_analysis = self.analyze_with_fireworks(pdf_text)
+                    metadata['Fireworks_Analysis'] = fireworks_analysis
+                    
+                    # Actualizar facultad si Fireworks sugiere una mejor
+                    if fireworks_analysis.get('Posible facultad/área de conocimiento'):
+                        metadata['Facultad'] = fireworks_analysis['Posible facultad/área de conocimiento']
+            
+            return metadata
+            
         except Exception as e:
             logging.error(f"Error extrayendo metadatos: {str(e)}")
             return None
-
+        
     def detect_facultad(self, text):
         text_lower = text.lower()
         for keyword, facultad in self.facultad_map.items():
@@ -300,25 +373,28 @@ class ScholarScraperUH:
             logging.error(f"Error guardando resultados: {str(e)}", exc_info=True)
             return False
 
+# Modificación en el main para usar la API key
 if __name__ == "__main__":
     print("Iniciando extracción de documentos científicos de la UH...")
-    scraper = ScholarScraperUH()
+    
+    # Configura tu API key de Fireworks aquí o déjala como None para no usarla
+    FIREWORKS_API_KEY = "fw_3Zn57yCKjDyBFE4TxLmvmnGV"  # o None
+    
+    scraper = ScholarScraperUH(FIREWORKS_API_KEY)
     articulos = scraper.scrape()
+    
     if articulos:
         print(f"\nExtracción completada! Artículos encontrados: {len(articulos)}")
         if scraper.save_results(articulos):
             print("Datos guardados exitosamente en articulos_uh.csv y articulos_uh.json")
+            
+            # Mostrar ejemplo de análisis de Fireworks si está disponible
+            if FIREWORKS_API_KEY:
+                print("\nEjemplo de análisis con Fireworks AI:")
+                for art in articulos[:2]:  # Mostrar solo 2 ejemplos
+                    if 'Fireworks_Analysis' in art:
+                        print(f"\nTítulo: {art['Título']}")
+                        print("Análisis:")
+                        print(json.dumps(art['Fireworks_Analysis'], indent=2, ensure_ascii=False))
         else:
             print("Error al guardar los datos. Ver scraper.log")
-        try:
-            df = pd.DataFrame(articulos)
-            print("\nResumen estadístico:")
-            print(f"- Artículos encontrados: {len(df)}")
-            print(f"- Años cubiertos: {df['Año'].min()} - {df['Año'].max()}")
-            print(f"- Facultades más comunes:")
-            print(df['Facultad'].value_counts().head(5))
-            print(f"- Tipos de documentos: {df['Tipo Documento'].value_counts().to_dict()}")
-        except Exception:
-            pass
-    else:
-        print("No se extrajo ningún artículo.")
